@@ -26,7 +26,7 @@ class Post(BaseModel):
     title: str
     description: str
 
-
+# manage database connection
 while True:
     try:
         conn = pg2.connect(
@@ -50,19 +50,32 @@ def index():
     return {"message": "Hello World from FastAPI!"}
 
 
-@app.get("/posts")
-def get_posts():
-    cursor.execute("""select * from posts""")
-    posts_list = cursor.fetchall()
-    return {"data": posts_list}
+# @app.get("/posts")
+# def get_posts():
+#     cursor.execute("""select * from posts""") # way to get data from database using sql query
+#     posts_list = cursor.fetchall()
+#     return {"data": posts_list}
 
+
+@app.get("/posts", status_code=status.HTTP_200_OK)
+def get_posts(db: Session = Depends(get_db)):
+    posts = db.query(models.Post).all() # get all posts from database using sqlalchemy orm
+    return {"data": posts}
+
+
+# @app.post("/posts", status_code=status.HTTP_201_CREATED)
+# def create_post(post: Post):
+#     # cursor.execute("""insert into posts(title,description) values(%s,%s) returning * """,(post.title, post.description))
+#     # new_post = cursor.fetchone()
+#     # conn.commit()
+#     return {"data": new_post}
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_post(post: Post):
-    cursor.execute("""insert into posts(title,description) values(%s,%s) returning * """,(post.title, post.description))
-
-    new_post = cursor.fetchone()
-    conn.commit()
+def create_post(post:Post, db: Session = Depends(get_db)):
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
     return {"data": new_post}
 
 
