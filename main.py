@@ -27,22 +27,22 @@ class Post(BaseModel):
     description: str
 
 # manage database connection
-while True:
-    try:
-        conn = pg2.connect(
-            host='localhost',
-            database='fastapidb', 
-            user='postgres',
-            password='rootuser',
-            cursor_factory=RealDictCursor
-        )
-        cursor = conn.cursor()
-        print("Database connection established.")
-        break
-    except Exception as e:
-        print(f"Error connecting to the database: {e}")
-        cursor = None
-        time.sleep(2)
+# while True:
+#     try:
+#         conn = pg2.connect(
+#             host='localhost',
+#             database='fastapidb',
+#             user='postgres',
+#             password='rootuser',
+#             cursor_factory=RealDictCursor
+#         )
+#         cursor = conn.cursor()
+#         print("Database connection established.")
+#         break
+#     except Exception as e:
+#         print(f"Error connecting to the database: {e}")
+#         cursor = None
+#         time.sleep(2)
 
 
 @app.get("/")
@@ -81,9 +81,10 @@ def create_post(post:Post, db: Session = Depends(get_db)):
 
 # get post by id
 @app.get("/posts/{id}", status_code=status.HTTP_200_OK)
-def get_post(id: int):
-    cursor.execute(""" select * from posts where id = %s """, (str(id),))
-    post = cursor.fetchone()
+def get_post(id: int, db: Session = Depends(get_db)):
+    # cursor.execute(""" select * from posts where id = %s """, (str(id),))
+    # post = cursor.fetchone()
+    post = db.query(models.Post).filter(models.Post.id == id).first()
 
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
@@ -93,23 +94,37 @@ def get_post(id: int):
 
 # delte post by id
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id: int):
-    cursor.execute(""" delete from posts where id = %s returning * """, (str(id),))
-    post = cursor.fetchone()
-    conn.commit()
+def delete_post(id: int, db: Session = Depends(get_db)):
+    # cursor.execute(""" delete from posts where id = %s returning * """, (str(id),))
+    # post = cursor.fetchone()
+    # conn.commit()
+    post = db.query(models.Post).filter(models.Post.id == id).first()
+    print(post)
+    if post:
+        db.delete(post)
+        db.commit()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
+    # db.refresh(post)
 
 
 # update post
 @app.put('/posts/{id}')
-def update_post(id: int, post: Post):
-    cursor.execute(""" update posts set title = %s, description = %s where id = %s returning * """, (post.title, post.description, str(id)))
-    updated_post = cursor.fetchone()
-    conn.commit()
+def update_post(id: int, post: Post, db: Session = Depends(get_db)):
+    # cursor.execute(""" update posts set title = %s, description = %s where id = %s returning * """, (post.title, post.description, str(id)))
+    # updated_post = cursor.fetchone()
+    # conn.commit()
 
-    if not updated_post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
-    return {"data": updated_post}
+    # if not updated_post:
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
+    # return {"data": updated_post}
+    obj = db.query(models.Post).filter(models.Post.id == id).first()
+    if obj:
+        for key, value in post.dict().items():
+            setattr(obj, key, value)
+
+        db.commit()
+        db.refresh(obj)
+        return {"data": obj}
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Post with id {id} not found")
